@@ -1,0 +1,243 @@
+---
+
+workflow:
+  rules:
+    # For merge requests created to `develop` branch
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      variables:
+        IMAGE_TAG: 'dev-pr-${CI_MERGE_REQUEST_IID}'
+        HELM_DIFF: "True"
+    # For merge requests created to `main` branch from `develop` branch
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "develop"'
+      variables:
+        IMAGE_TAG: 'main-pr-${CI_MERGE_REQUEST_IID}'
+        HELM_DIFF: "True"
+    # For `main` and `develop` branch, create a pipeline (this includes on schedules, pushes, merges, etc.).
+    - if: '$CI_COMMIT_BRANCH =~ /^main|develop$/'
+      variables:
+        IMAGE_TAG: '${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
+        HELM_APPLY: "True"
+#        IMAGE_TAG: "main-46"
+    # For tags, create a pipeline.
+    - if: '$CI_COMMIT_TAG =~ /^v.*/'
+      variables:
+        IMAGE_TAG: '${CI_COMMIT_TAG}'
+        HELM_APPLY: "True"
+    # For manual runs, create a pipeline
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      variables:
+        IMAGE_TAG: 'manual-${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
+        HELM_APPLY: "True"
+
+stages:
+  - lint
+  - build
+  - test
+  - deploy
+  - validate
+  - release
+
+.lint:
+  stage: lint
+  rules:
+    # We run lints for MRs only
+    - if: '$CI_MERGE_REQUEST_IID'
+
+Lint:Helm:
+  extends: .lint
+  image: centosadmin/kubernetes-helm:3.10.3
+  script:
+    - helm lint .helm
+
+Lint:Docker:
+  extends: .lint
+  script:
+    - docker run --rm -i hadolint/hadolint:v2.12.0 < "${CI_PROJECT_DIR}/yelb-appserver"/Dockerfile
+    - docker run --rm -i hadolint/hadolint:v2.12.0 < "${CI_PROJECT_DIR}/yelb-db"/Dockerfile
+    - docker run --rm -i hadolint/hadolint:v2.12.0 < "${CI_PROJECT_DIR}/yelb-yelb-ui"/Dockerfile
+
+Lint:Yaml:
+  extends: .lint
+  image:
+    name: cytopia/yamllint:1-0.14
+    entrypoint: ["/bin/ash", "-c"]
+  script:
+    - yamllint -f colored . || exit_code=$?
+    - if [ ${exit_code} -ne 0 ]; then echo "Yaml linter filed" ;
+    
+.build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.13.0-debug
+    entrypoint: [""]
+  # when:
+  #   manual
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+  
+Build:Docker:Appserver:
+  extends: .build
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-appserver" --destination "${CI_REGISTRY_IMAGE}/appserver:${IMAGE_TAG}"
+
+Build:Docker:DB:
+  extends: .build
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/db:${IMAGE_TAG}"
+
+Build:Docker:UI:
+  extends: .build
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-ui" --destination "${CI_REGISTRY_IMAGE}/ui:${IMAGE_TAG}"
+
+Test:Unit:
+  stage: test
+  script: echo "Unit tests"
+  rules: &develop
+    # We run unit tests for MRs created against the develop branch
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+    # And for develop branch
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+Test:Integration:
+  stage: test
+  script: echo "Unit tests"
+  rules: &main
+    # We run unit tests for MRs created against the main branch
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    # And for main branch
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+Test:SecurityBasic:
+  stage: test
+  script: echo "Some basic security checks"
+  rules: *develop
+
+Test:SecurityAdvanced:
+  stage: test
+  script: echo "Some advanced security checks"
+  rules: *main
+
+
+.deploy:
+  stage: deploy
+  image: centosadmin/kubernetes-helm:3.10.3
+  variables:
+    HELM_SET: --set image.tag=${IMAGE_TAG}
+  script:
+    - kubectl config set-cluster k8s --insecure-skip-tls-verify=true --server=$K8S_API_URL
+    - kubectl config set-credentials ci --token=$K8S_CI_TOKEN
+    - kubectl config set-context ci --cluster=k8s --user=ci
+    - kubectl config use-context ci
+    - kubectl create namespace $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME --dry-run=client -o yaml | grep -v creationTimestamp | kubectl apply -f -
+    - kubectl -n $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME create secret docker-registry --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --docker-server=$CI_REGISTRY registry-credentials -o yaml --dry-run=client | grep -v creationTimestamp | kubectl apply -f -
+    - helm upgrade --install $CI_PROJECT_NAME-${CI_ENVIRONMENT_NAME} .helm
+        --set ui.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ui"
+        --set db.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/db"
+        --set appserver.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/appserver"
+        --set ui.image.tag=${IMAGE_TAG}
+        --set db.image.tag=${IMAGE_TAG}
+        --set appserver.image.tag=${IMAGE_TAG}
+        --set "ingress.hosts[0].host=${CI_ENVIRONMENT_URL},ingress.hosts[0].paths[0].path=/"
+        --set ui.env\[0\].name=YELB_APPSERVER_ENDPOINT,ui.env\[0\].value="http://${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver:4567"
+        --set ui.env\[1\].name=APP_SERVER_HOSTNAME,ui.env\[1\].value="${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver"
+        --set appserver.env\[0\].name=RACK_ENV,appserver.env\[0\].value=custom
+        --set appserver.env\[1\].name=APP_SERVER_HOSTNAME,appserver.env\[1\].value="${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver"
+        --set appserver.env\[2\].name=REDIS_SERVER_ENDPOINT,appserver.env\[2\].value="${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-cache"
+        --set db.sql.dbHost="${CI_YELB_DB_SERVER_ENDPOINT}"
+        --set db.sql.dbPort="${CI_YELB_DB_SERVER_PORT}"
+        --set db.sql.dbUser="${CI_YELB_DB_SERVER_USERNAME}"
+        --set db.sql.password="${CI_YELB_DB_SERVER_PASSWORD}"
+        --set db.sql.dbName="${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}"
+        --set db.sql.initdb.enabled="true"
+        --set db.sql.initdb.createdb="true"
+        --wait
+        --timeout 300s
+        --atomic
+        --debug
+        --namespace $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME
+
+# .dbinit:
+#   stage: deploy
+#   variables:
+#     POSTGRES_PASSWORD: "${CI_YELB_DB_SERVER_PASSWORD}"
+#   image: postgres
+#   script:
+#     - psql -h "${CI_YELB_DB_SERVER_ENDPOINT}" -v ON_ERROR_STOP=1 --username "${CI_YELB_DB_SERVER_USERNAME}" <<-EOSQL
+#       CREATE DATABASE "${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}";
+#       \connect "${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}";
+#       CREATE TABLE restaurants (
+#       name        char(30),
+#       count       integer,
+#       PRIMARY KEY (name)
+#       );
+#       INSERT INTO restaurants (name, count) VALUES ('outback', 0);
+#       INSERT INTO restaurants (name, count) VALUES ('bucadibeppo', 0);
+#       INSERT INTO restaurants (name, count) VALUES ('chipotle', 0);
+#       INSERT INTO restaurants (name, count) VALUES ('ihop', 0);
+#       EOSQL
+
+Deploy:Dev:
+  extends: .deploy
+  variables: &devVars
+    ENDPOINT: "http://dev.${CI_DEPLOYMENT_DOMAIN}"
+  environment:
+    name: development
+    url: "dev.${CI_DEPLOYMENT_DOMAIN}"
+  rules:
+    # We show dry-run only for MRs  to `develop`
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+    # We deploy dev env from develop branch only
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+Deploy:Staging:
+  extends: .deploy
+  variables: &stgVars
+    ENDPOINT: "http://staging.${CI_DEPLOYMENT_DOMAIN}"
+  environment:
+    name: staging
+    url: "staging.${CI_DEPLOYMENT_DOMAIN}"
+  rules:
+    # We show dry-run only for MRs to `main` from `develop`
+    - if: '$CI_MERGE_REQUEST_IID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "develop"'
+    # We deploy staging env from main branch only
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+Deploy:Production:
+  extends: .deploy
+  variables: &prodVars
+    ENDPOINT: "http://${CI_DEPLOYMENT_DOMAIN}"
+    ALLOWED_USERS_LIST: >
+      root - Alexander Popov
+  before_script:
+    - (echo ${ALLOWED_USERS_LIST} | grep ${GITLAB_USER_LOGIN}) && echo "Users is allowed to proceed" || (echo "No permissions"; exit 1)
+  environment:
+    name: production
+    url: "${CI_DEPLOYMENT_DOMAIN}"
+  rules:
+    # We deploy prod env from tags only
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+
+
+Validate:Smoke:
+  stage: validate
+  script: echo "e2e tests"
+  rules:
+    # We run smoke tests after deployments
+    - if: '$CI_COMMIT_BRANCH =~ /^main|develop$/'
+
+Validate:E2E:
+  stage: validate
+  script: echo "e2e tests"
+  rules:
+    # We run e2e tests for main branch only
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+Release:Tag:
+  stage: release
+  script: echo "release"
+  rules:
+    # We run release creation from main branch only
+    - if: '$CI_COMMIT_BRANCH == "main"'

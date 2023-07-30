@@ -1,0 +1,48 @@
+---
+{{- if .Values.db.sql.initdb.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: '{{ .Release.Name }}-init-db'
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hhok": post-upgrade
+spec:
+  template:
+    metadata:
+      labels:
+        release: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      terminationGracePeriodSeconds: 0
+      restartPolicy: OnFailure
+      containers:
+        - name: init-database
+          image: {{ .Values.db.sql.initdb.image }}
+          env:
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "yelb-postgres-credentials"
+                key: DBPASSWORD
+          - name: ON_ERROR_STOP
+            value: "1"
+          command: ["/bin/sh","-c"]
+          args:
+            - echo "Initializing database";
+{{- if .Values.db.sql.initdb.createdb }}            
+              createdb -h {{ .Values.db.sql.dbHost }} -p {{ printf "%s" .Values.db.sql.dbPort }} -U {{ .Values.db.sql.dbUser }} {{ .Values.db.sql.dbName }};
+{{- end }}                
+              psql --host {{ .Values.db.sql.dbHost }} -U {{ .Values.db.sql.dbUser }} -p {{ printf "%s" .Values.db.sql.dbPort }} -d {{ .Values.db.sql.dbName }} -c
+              "CREATE TABLE restaurants (name char(30), count integer, PRIMARY KEY (name)); 
+              INSERT INTO restaurants (name, count) VALUES ('outback', 0); 
+              INSERT INTO restaurants (name, count) VALUES ('bucadibeppo', 0); 
+              INSERT INTO restaurants (name, count) VALUES ('chipotle', 0);
+              INSERT INTO restaurants (name, count) VALUES ('ihop', 0);";
+{{- end }}

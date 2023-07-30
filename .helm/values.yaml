@@ -1,0 +1,105 @@
+ui:
+  replicas: 2
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  env:
+    - name: "YELB_APPSERVER_ENDPOINT"
+      value: ""
+    - name: "APP_SERVER_HOSTNAME"
+      value: ""
+
+db:
+  replicas: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  sql:
+    initdb:
+      enabled: false
+      createdb: false
+      image: postgres:10.21
+    password: ""
+    dbHost: ""
+    dbName: ""
+    dbPort: ""
+    dbUser: ""
+
+cache:
+  replicas: 1
+  image:
+    repository: redis
+    tag: 4.0.2
+    pullPolicy: IfNotPresent
+
+appserver:
+  replicas: 2
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  env:
+    - name: "RACK_ENV"
+      value: "custom"
+    - name: "APP_SERVER_HOSTNAME"
+      value: ""
+    - name: "REDIS_SERVER_ENDPOINT"
+      value: ""
+
+
+# TODO: move to variables
+imagePullSecrets:
+  - name: registry-credentials
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+    
+service:
+  type: LoadBalancer
+  port: 80
+
+ingress:
+  enabled: true
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

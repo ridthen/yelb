@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "application.fullname" . }}-ui
+spec:
+  replicas: {{ .Values.ui.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "application.fullname" . }}-ui
+  template:
+    metadata:
+      labels:
+        app: {{ include "application.fullname" . }}-ui
+        tier: frontend
+        release: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: yelb-ui
+        image:  "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+        imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+        ports:
+        - containerPort: 80
+        env:
+          {{- range .Values.ui.env }}
+          - name: {{ .name }}
+            value: {{ .value }}
+          {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "application.fullname" . }}-cache
+spec:
+  replicas: {{ .Values.cache.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "application.fullname" . }}-cache
+  template:
+    metadata:
+      labels:
+        app: {{ include "application.fullname" . }}-cache
+        tier: cache
+        release: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      containers:
+      - name: redis-server
+        image: "{{ .Values.cache.image.repository }}:{{ .Values.cache.image.tag }}"
+        imagePullPolicy: {{ .Values.db.image.pullPolicy }}
+        ports:
+        - containerPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "application.fullname" . }}-db
+spec:
+  replicas: {{ .Values.db.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "application.fullname" . }}-db
+  template:
+    metadata:
+      labels:
+        app: {{ include "application.fullname" . }}-db
+        tier: backenddb
+        release: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ include "application.fullname" . }}-db
+        image:  "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+        imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+        ports:
+        - containerPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "application.fullname" . }}-appserver
+spec:
+  replicas: {{ .Values.appserver.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "application.fullname" . }}-appserver
+  template:
+    metadata:
+      labels:
+        app: {{ include "application.fullname" . }}-appserver
+        tier: middletier
+        release: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ include "application.fullname" . }}-appserver
+        image:  "{{ .Values.appserver.image.repository }}:{{ .Values.appserver.image.tag }}"
+        imagePullPolicy: {{ .Values.appserver.image.pullPolicy }}
+        ports:
+        - containerPort: 4567
+        env:
+          - name: YELB_DB_SERVER_ENDPOINT
+            value: {{ .Values.db.sql.dbHost }}
+          - name: YELB_DB_SERVER_PORT
+            value: {{ .Values.db.sql.dbPort }}
+          - name: YELB_DB_SERVER_USERNAME
+            value: {{ .Values.db.sql.dbUser }}
+          - name: YELB_DB_SERVER_PASSWORD
+            value: {{ .Values.db.sql.password }}
+          - name: YELB_DATABASE
+            value: {{ .Values.db.sql.dbName }}
+          {{- range .Values.appserver.env }}
+          - name: {{ .name }}
+            value: {{ .value }}
+          {{- end }}

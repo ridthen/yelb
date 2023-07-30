@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "application.fullname" . }}-ui
+  labels:
+    app: {{ include "application.fullname" . }}-ui
+    tier: frontend
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    protocol: TCP
+    targetPort: 80
+    name: http
+  selector:
+    app: {{ include "application.fullname" . }}-ui
+    tier: frontend
+    release: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "application.fullname" . }}-cache
+  labels:
+    app: {{ include "application.fullname" . }}-cache
+    tier: cache
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+  selector:
+    app: {{ include "application.fullname" . }}-cache
+    tier: cache
+    release: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "application.fullname" . }}-db
+  labels:
+    app: {{ include "application.fullname" . }}-db
+    tier: backenddb
+    release: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+  selector:
+    app: {{ include "application.fullname" . }}-db
+    tier: backenddb
+    release: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "application.fullname" . }}-appserver
+  labels:
+    app: {{ include "application.fullname" . }}-appserver
+    tier: middletier
+    release: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4567
+  selector:
+    app: {{ include "application.fullname" . }}-appserver
+    tier: middletier
+    release: {{ .Release.Name }}
