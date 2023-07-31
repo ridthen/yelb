@@ -81,10 +81,10 @@ Build:Docker:Appserver:
   script:
     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-appserver" --destination "${CI_REGISTRY_IMAGE}/appserver:${IMAGE_TAG}"
 
-# Build:Docker:DB:
-#   extends: .build
-#   script:
-#     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/db:${IMAGE_TAG}"
+Build:Docker:DB:
+  extends: .build
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/initdb:${IMAGE_TAG}"
 
 Build:Docker:UI:
   extends: .build
@@ -134,12 +134,13 @@ Test:SecurityAdvanced:
     - kubectl -n $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME create secret docker-registry --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --docker-server=$CI_REGISTRY registry-credentials -o yaml --dry-run=client | grep -v creationTimestamp | kubectl apply -f -
     - helm upgrade --install $CI_PROJECT_NAME-${CI_ENVIRONMENT_NAME} .helm
         --set ui.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ui"
-        --set db.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/db"
+        --set db.sql.initdb.image="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/initdb:${IMAGE_TAG}"
         --set appserver.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/appserver"
         --set ui.image.tag=${IMAGE_TAG}
         --set db.image.tag=${IMAGE_TAG}
         --set appserver.image.tag=${IMAGE_TAG}
         --set "ingress.hosts[0].host=${CI_ENVIRONMENT_URL},ingress.hosts[0].paths[0].path=/"
+        --set "ingress.tls[0].hosts[0]=${CI_ENVIRONMENT_URL}"
         --set ui.env\[0\].name=YELB_APPSERVER_ENDPOINT,ui.env\[0\].value="http://${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver:4567"
         --set ui.env\[1\].name=APP_SERVER_HOSTNAME,ui.env\[1\].value="${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver"
         --set appserver.env\[0\].name=RACK_ENV,appserver.env\[0\].value=custom
