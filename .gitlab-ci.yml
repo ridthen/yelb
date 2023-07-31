@@ -134,7 +134,7 @@ Test:SecurityAdvanced:
     - kubectl -n $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME create secret docker-registry --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --docker-server=$CI_REGISTRY registry-credentials -o yaml --dry-run=client | grep -v creationTimestamp | kubectl apply -f -
     - helm upgrade --install $CI_PROJECT_NAME-${CI_ENVIRONMENT_NAME} .helm
         --set ui.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ui"
-        --set db.sql.initdb.image="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/initdb:${IMAGE_TAG}"
+        --set db.sql.initdb.image="${CI_REGISTRY_IMAGE}/initdb:${IMAGE_TAG}"
         --set appserver.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/appserver"
         --set ui.image.tag=${IMAGE_TAG}
         --set db.image.tag=${IMAGE_TAG}
