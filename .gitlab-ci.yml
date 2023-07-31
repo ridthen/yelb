@@ -15,9 +15,9 @@ workflow:
     # For `main` and `develop` branch, create a pipeline (this includes on schedules, pushes, merges, etc.).
     - if: '$CI_COMMIT_BRANCH =~ /^main|develop$/'
       variables:
-        IMAGE_TAG: '${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
+#        IMAGE_TAG: '${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
         HELM_APPLY: "True"
-#        IMAGE_TAG: "main-46"
+        IMAGE_TAG: "latest"
     # For tags, create a pipeline.
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
       variables:
@@ -70,8 +70,8 @@ Lint:Yaml:
   image:
     name: gcr.io/kaniko-project/executor:v1.13.0-debug
     entrypoint: [""]
-  # when:
-  #   manual
+  when:
+    manual
   before_script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
@@ -134,7 +134,7 @@ Test:SecurityAdvanced:
     - kubectl -n $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME create secret docker-registry --docker-username=$CI_DEPLOY_USER --docker-password=$CI_DEPLOY_PASSWORD --docker-server=$CI_REGISTRY registry-credentials -o yaml --dry-run=client | grep -v creationTimestamp | kubectl apply -f -
     - helm upgrade --install $CI_PROJECT_NAME-${CI_ENVIRONMENT_NAME} .helm
         --set ui.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/ui"
-        --set db.sql.initdb.image="${CI_REGISTRY_IMAGE}/initdb:${IMAGE_TAG}"
+        --set db.sql.initdb.image="bitnami/postgresql:15-debian-11"
         --set appserver.image.repository="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/appserver"
         --set ui.image.tag=${IMAGE_TAG}
         --set db.image.tag=${IMAGE_TAG}
