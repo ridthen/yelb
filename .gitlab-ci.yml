@@ -81,10 +81,10 @@ Build:Docker:Appserver:
   script:
     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-appserver" --destination "${CI_REGISTRY_IMAGE}/appserver:${IMAGE_TAG}"
 
-Build:Docker:DB:
-  extends: .build
-  script:
-    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/db:${IMAGE_TAG}"
+# Build:Docker:DB:
+#   extends: .build
+#   script:
+#     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/db:${IMAGE_TAG}"
 
 Build:Docker:UI:
   extends: .build
@@ -157,26 +157,6 @@ Test:SecurityAdvanced:
         --atomic
         --debug
         --namespace $CI_PROJECT_NAME-$CI_ENVIRONMENT_NAME
-
-# .dbinit:
-#   stage: deploy
-#   variables:
-#     POSTGRES_PASSWORD: "${CI_YELB_DB_SERVER_PASSWORD}"
-#   image: postgres
-#   script:
-#     - psql -h "${CI_YELB_DB_SERVER_ENDPOINT}" -v ON_ERROR_STOP=1 --username "${CI_YELB_DB_SERVER_USERNAME}" <<-EOSQL
-#       CREATE DATABASE "${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}";
-#       \connect "${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}";
-#       CREATE TABLE restaurants (
-#       name        char(30),
-#       count       integer,
-#       PRIMARY KEY (name)
-#       );
-#       INSERT INTO restaurants (name, count) VALUES ('outback', 0);
-#       INSERT INTO restaurants (name, count) VALUES ('bucadibeppo', 0);
-#       INSERT INTO restaurants (name, count) VALUES ('chipotle', 0);
-#       INSERT INTO restaurants (name, count) VALUES ('ihop', 0);
-#       EOSQL
 
 Deploy:Dev:
   extends: .deploy
