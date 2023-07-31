@@ -81,7 +81,7 @@ Build:Docker:Appserver:
   script:
     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-appserver" --destination "${CI_REGISTRY_IMAGE}/appserver:${IMAGE_TAG}"
 
-Build:Docker:DB:
+Build:Docker:Initdb:
   extends: .build
   script:
     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/initdb:${IMAGE_TAG}"
