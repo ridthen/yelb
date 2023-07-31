@@ -15,9 +15,8 @@ workflow:
     # For `main` and `develop` branch, create a pipeline (this includes on schedules, pushes, merges, etc.).
     - if: '$CI_COMMIT_BRANCH =~ /^main|develop$/'
       variables:
-#        IMAGE_TAG: '${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
+        IMAGE_TAG: '${CI_COMMIT_BRANCH}-${CI_PIPELINE_IID}'
         HELM_APPLY: "True"
-        IMAGE_TAG: "latest"
     # For tags, create a pipeline.
     - if: '$CI_COMMIT_TAG =~ /^v.*/'
       variables:
@@ -70,8 +69,6 @@ Lint:Yaml:
   image:
     name: gcr.io/kaniko-project/executor:v1.13.0-debug
     entrypoint: [""]
-  when:
-    manual
   before_script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
@@ -80,11 +77,6 @@ Build:Docker:Appserver:
   extends: .build
   script:
     - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-appserver" --destination "${CI_REGISTRY_IMAGE}/appserver:${IMAGE_TAG}"
-
-Build:Docker:Initdb:
-  extends: .build
-  script:
-    - /kaniko/executor --context "${CI_PROJECT_DIR}/yelb-db" --destination "${CI_REGISTRY_IMAGE}/initdb:${IMAGE_TAG}"
 
 Build:Docker:UI:
   extends: .build
@@ -151,7 +143,7 @@ Test:SecurityAdvanced:
         --set db.sql.dbUser="${CI_YELB_DB_SERVER_USERNAME}"
         --set db.sql.password="${CI_YELB_DB_SERVER_PASSWORD}"
         --set db.sql.dbName="${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}"
-        --set db.sql.initdb.enabled="true"
+        --set db.sql.initdb.enabled="false"
         --set db.sql.initdb.createdb="false"
         --wait
         --timeout 300s
