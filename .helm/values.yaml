@@ -21,7 +21,7 @@ db:
     initdb:
       enabled: false
       createdb: false
-      image: postgres:10.21
+      image: postgres:15
     password: ""
     dbHost: ""
     dbName: ""

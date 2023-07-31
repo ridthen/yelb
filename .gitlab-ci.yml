@@ -151,7 +151,7 @@ Test:SecurityAdvanced:
         --set db.sql.password="${CI_YELB_DB_SERVER_PASSWORD}"
         --set db.sql.dbName="${CI_YELB_DATABASE}-${CI_ENVIRONMENT_NAME}"
         --set db.sql.initdb.enabled="true"
-        --set db.sql.initdb.createdb="true"
+        --set db.sql.initdb.createdb="false"
         --wait
         --timeout 300s
         --atomic

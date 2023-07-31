@@ -6,9 +6,13 @@ FROM bitnami/ruby:2.7.4
 WORKDIR /app
 
 ### hack to allow the setup of the pg gem (which would fail otherwise)
-RUN apt-get update
-RUN apt-get install libpq-dev -y
+RUN apt-get update && \
+    apt-get install libpq-dev ca-certificates -y && \
+    rm -rf /var/cache/apt/* /var/lib/apt/lists/*
 ### end of hack (this would require additional research and optimization)
+
+COPY CA.pem /usr/local/share/ca-certificates/yc_ca.crt
+RUN update-ca-certificates
 
 COPY *.rb ./
 COPY Gemfile Gemfile

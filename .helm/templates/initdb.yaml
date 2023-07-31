@@ -36,10 +36,14 @@ spec:
           command: ["/bin/sh","-c"]
           args:
             - echo "Initializing database";
+              mkdir -p ~/.postgresql;
+              apt-get update && apt-get -y install wget;
+              wget "https://storage.yandexcloud.net/cloud-certs/CA.pem" --output-document ~/.postgresql/root.crt;
+              chmod 0600 ~/.postgresql/root.crt;
 {{- if .Values.db.sql.initdb.createdb }}            
               createdb -h {{ .Values.db.sql.dbHost }} -p {{ printf "%s" .Values.db.sql.dbPort }} -U {{ .Values.db.sql.dbUser }} {{ .Values.db.sql.dbName }};
 {{- end }}                
-              psql --host {{ .Values.db.sql.dbHost }} -U {{ .Values.db.sql.dbUser }} -p {{ printf "%s" .Values.db.sql.dbPort }} -d {{ .Values.db.sql.dbName }} -c
+              psql --host {{ .Values.db.sql.dbHost }} -U {{ .Values.db.sql.dbUser }} -p {{ printf "%s" .Values.db.sql.dbPort }} -d {{ .Values.db.sql.dbName }} sslmode=verify-full target_session_attrs=read-write -c
               "CREATE TABLE restaurants (name char(30), count integer, PRIMARY KEY (name)); 
               INSERT INTO restaurants (name, count) VALUES ('outback', 0); 
               INSERT INTO restaurants (name, count) VALUES ('bucadibeppo', 0); 
