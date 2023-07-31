@@ -44,25 +44,6 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "application.fullname" . }}-db
-  labels:
-    app: {{ include "application.fullname" . }}-db
-    tier: backenddb
-    release: {{ .Release.Name }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-spec:
-  type: ClusterIP
-  ports:
-  - port: 5432
-  selector:
-    app: {{ include "application.fullname" . }}-db
-    tier: backenddb
-    release: {{ .Release.Name }}
----
-apiVersion: v1
-kind: Service
-metadata:
   name: {{ include "application.fullname" . }}-appserver
   labels:
     app: {{ include "application.fullname" . }}-appserver
