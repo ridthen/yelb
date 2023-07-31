@@ -181,10 +181,10 @@ Deploy:Production:
   extends: .deploy
   variables: &prodVars
     ENDPOINT: "http://${CI_DEPLOYMENT_DOMAIN}"
-    ALLOWED_USERS_LIST: >
-      root - Alexander Popov
-  before_script:
-    - (echo ${ALLOWED_USERS_LIST} | grep ${GITLAB_USER_LOGIN}) && echo "Users is allowed to proceed" || (echo "No permissions"; exit 1)
+  #   ALLOWED_USERS_LIST: >
+  #     root - Alexander Popov
+  # before_script:
+  #   - (echo ${ALLOWED_USERS_LIST} | grep ${GITLAB_USER_LOGIN}) && echo "Users is allowed to proceed" || (echo "No permissions"; exit 1)
   environment:
     name: production
     url: "${CI_DEPLOYMENT_DOMAIN}"
