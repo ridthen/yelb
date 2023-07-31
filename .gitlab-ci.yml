@@ -132,7 +132,7 @@ Test:SecurityAdvanced:
         --set db.image.tag=${IMAGE_TAG}
         --set appserver.image.tag=${IMAGE_TAG}
         --set "ingress.hosts[0].host=${CI_ENVIRONMENT_URL},ingress.hosts[0].paths[0].path=/"
-        --set "ingress.tls[0].hosts[0]=${CI_ENVIRONMENT_URL}"
+        --set "ingress.tls[0].hosts[0]=${CI_ENVIRONMENT_URL},ingress.tls[0].secretName=letsencrypt"
         --set ui.env\[0\].name=YELB_APPSERVER_ENDPOINT,ui.env\[0\].value="http://${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver:4567"
         --set ui.env\[1\].name=APP_SERVER_HOSTNAME,ui.env\[1\].value="${CI_PROJECT_NAME}-${CI_ENVIRONMENT_NAME}-appserver"
         --set appserver.env\[0\].name=RACK_ENV,appserver.env\[0\].value=custom
